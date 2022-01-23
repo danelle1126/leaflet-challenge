@@ -37,7 +37,7 @@ let basemaps = {
 // make map object
 var myMap = L.map("map", {
     center: [36.7783, -119.4179],
-    zoom: 3,
+    zoom: 5,
     layers: [grayscale, waterColor, topoMap, defaultMap]
 });
 
@@ -82,17 +82,51 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
     }
     function dataStyle(feature) {
         return {
-            opacity: 1,
-            fillOpacity: 1,
-            fillColor: dataColor()
+            opacity: 0.5,
+            fillOpacity: 0.5,
+            fillColor: dataColor(feature.geometry.coordinates[2]),
+            color: "000000",
+            radius: radiusSize(feature.properties.mag),
+            weight: 0.5,
+            stroke: true
         }
     }
+    L.geoJson(earthquakeData, {
+        pointToLayer: function(feature,latLng) {
+            return L.circleMarker(latLng);
+        },
+        style: dataStyle, 
+        onEachFeature: function(feature,layer){
+            layer.bindPopup(`Magnitude: <b>${feature.properties.mag}</b><br> 
+            Depth: <b>${feature.geometry.coordinates[2]}</b><br> 
+            Location: <b>${feature.properties.place}</b>`);
+        }
+    }).addTo(earthquakes);
 });
 
+earthquakes.addTo(myMap);
+
 let overlays = {
-    "Tectonic Plates": tectonicplates
+    "Tectonic Plates": tectonicplates,
+    "Earthquake Data": earthquakes
 };
 
 L.control
     .layers(basemaps, overlays)
     .addTo(myMap);
+
+let legend = L.control({
+    position: "bottomright"
+});
+
+legend.onAdd = function(){
+    let div = L.DomUtil.create("div", "info legend");
+    let intervals = [-10, 10, 30, 50, 70, 90];
+    let colors = ["green","#cafc03","#fcad03","#fc8403", "#fc4903","red"];
+    for (var i = 0; i < intervals.length; i++) {
+        div.innerHTML += "<i style='background: "+colors[i]+"'></i> "+intervals[i]+(intervals[i+1] ? "km to "+intervals[i+1]+"km<br>" : "+ km");
+    }
+    return div;
+};
+
+legend.addTo(myMap);
