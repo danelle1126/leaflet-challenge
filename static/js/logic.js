@@ -1,84 +1,74 @@
 // create tile layers
-var defaultMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+var myDefault = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 	maxZoom: 19,
 	attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 });
 
-// grayscale layer
-var grayscale = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}{r}.{ext}', {
-	attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+// dark background
+var dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+	attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
 	subdomains: 'abcd',
-	minZoom: 0,
+	maxZoom: 20
+});
+
+// satellite view
+var satellite = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}', {
 	maxZoom: 20,
-	ext: 'png'
-});
-
-var waterColor = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.{ext}', {
-	attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-	subdomains: 'abcd',
-	minZoom: 1,
-	maxZoom: 16,
-	ext: 'jpg'
-});
-
-var topoMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-	maxZoom: 17,
-	attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+	attribution: 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
 });
 
 // base map object
 let basemaps = {
-    GrayScale: grayscale,
-    "Water Color": waterColor,
-    "Topography": topoMap,
-    Default: defaultMap
+    "Dark Background": dark,
+    "Satellite Image": satellite,
+    Default: myDefault
 };
 
 // make map object
 var myMap = L.map("map", {
     center: [36.7783, -119.4179],
-    zoom: 5,
-    layers: [grayscale, waterColor, topoMap, defaultMap]
+    zoom: 2,
+    layers: [dark, satellite, myDefault]
 });
 
 // add default map
-defaultMap.addTo(myMap);
+myDefault.addTo(myMap);
 
 // get data for tectonic plates and draw on map
-let tectonicplates = new L.layerGroup();
+let tectonicPlates = new L.layerGroup();
 
 d3.json("https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json")
 .then(function(plateData){
     L.geoJson(plateData, {
-        color: "yellow",
-        weight: 1
-    }).addTo(tectonicplates);
+        color: "red",
+        weight: 3
+    }).addTo(tectonicPlates);
 });
 
-tectonicplates.addTo(myMap);
+tectonicPlates.addTo(myMap);
 
 // add earthquake data layer
-let earthquakes = new L.layerGroup();
+let earthquakeData = new L.layerGroup();
 
 d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson")
-.then(function(earthquakeData){
+.then(function(quakeData){
     function dataColor(depth){
         if (depth > 90)
             return "red";
         else if (depth > 70)
-            return "#fc4903";
+            return "orangered";
         else if (depth > 50)
-            return "#fc8403";
+            return "orange";
         else if (depth > 30)
-            return "#fcad03";
+            return "gold";
         else if (depth > 10)
-            return "#cafc03";
+            return "yellow";
         else return "green";   
     }
-    function radiusSize(mag){
-        if (mag == 0)
+    function radiusSize(magnitude){
+        if (magnitude == 0)
             return 1;
-        else return mag * 5;
+        else return magnitude * 2;
     }
     function dataStyle(feature) {
         return {
@@ -91,7 +81,7 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
             stroke: true
         }
     }
-    L.geoJson(earthquakeData, {
+    L.geoJson(quakeData, {
         pointToLayer: function(feature,latLng) {
             return L.circleMarker(latLng);
         },
@@ -101,14 +91,14 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
             Depth: <b>${feature.geometry.coordinates[2]}</b><br> 
             Location: <b>${feature.properties.place}</b>`);
         }
-    }).addTo(earthquakes);
+    }).addTo(earthquakeData);
 });
 
-earthquakes.addTo(myMap);
+earthquakeData.addTo(myMap);
 
 let overlays = {
-    "Tectonic Plates": tectonicplates,
-    "Earthquake Data": earthquakes
+    "Tectonic Plates": tectonicPlates,
+    "Earthquake Data": earthquakeData
 };
 
 L.control
@@ -122,7 +112,7 @@ let legend = L.control({
 legend.onAdd = function(){
     let div = L.DomUtil.create("div", "info legend");
     let intervals = [-10, 10, 30, 50, 70, 90];
-    let colors = ["green","#cafc03","#fcad03","#fc8403", "#fc4903","red"];
+    let colors = ["green","yellow","gold","orange", "orangered","red"];
     for (var i = 0; i < intervals.length; i++) {
         div.innerHTML += "<i style='background: "+colors[i]+"'></i> "+intervals[i]+(intervals[i+1] ? "km to "+intervals[i+1]+"km<br>" : "+ km");
     }
